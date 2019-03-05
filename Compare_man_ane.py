@@ -13,7 +13,6 @@ class ManPG(object):
         self.m = m
         self.k = k
         self.theta = 1 / k
-
         self.epsilon = 1e-5
 
         self.a0 = a0
@@ -23,7 +22,7 @@ class ManPG(object):
         self.a = a
         self.x = x
 
-        #self.lams = [0.5]
+        self.lams = [0.5, 0.1, 0.01]
         self.lam = 0.5
 
     def init_a(self):
@@ -100,21 +99,18 @@ class ManPG(object):
 
         self.costs = [obj]
 
-        #for lam in self.lams:
-        #   self.lam = lam
-        i = 0
-        g_a = np.ones(self.a.shape[0])
-        t = 0.1
-        while np.linalg.norm(g_a)**2 * t > self.epsilon:
-            g_a, t,obj = self.step()
-            i+=1
-            self.costs.append(obj)
-        #print("--- %s seconds ---" % (time.time() - start))
-        '''
-        while 1 - maxdoshift(self.a0, self.a) > 0.0001:
-            g_a, t, obj = self.step()
-            self.costs.append(obj)
-        '''
+        for lam in self.lams:
+            self.lam = lam
+            i = 0
+            g_a = np.ones(self.a.shape[0])
+            t = 0.1
+            while np.linalg.norm(g_a)**2 * t > self.epsilon:
+                g_a, t,obj = self.step()
+                i+=1
+                self.costs.append(obj)
+
+
+
 
 class anealing(object):
     def __init__(self, x0,a0,x,a):
@@ -126,7 +122,7 @@ class anealing(object):
         self.a0 = a0
         self.y =  np.real(np.fft.ifft(np.fft.fft(x0)*np.fft.fft(a0,m)))
         self.yhat = np.fft.fft(self.y)
-        #self.lams = [0.1]
+        self.lams = [0.5, 0.1, 0.01]
         self.lam = 0.5
         self.x = x
         self.a = a
@@ -209,22 +205,17 @@ class anealing(object):
         #self.a = -1*self.a
         #self.a /= np.linalg.norm(self.a)
 
-        #for lam in self.lams:
-        #    self.lam = lam
-        i = 0
-        g_a = np.ones(self.a.shape[0])
-        t = 0.1
-        #while i < self.max_iter and np.linalg.norm(g_a)**2 * t > self.epsilon:
-        while np.linalg.norm(g_a) ** 2 * t > self.epsilon:
-            #while i < self.max_iter:
-            g_a, cost,t,obj = self.step()
-            i+=1
-            #self.costs.append(obj)
-        #print("--- %s seconds ---" % (time.time() - start))
-        '''
-        while 1 - maxdoshift(self.a0, self.a) > 0.0001:
-            g_a,cost, t, obj = self.step()
-        '''
+        for lam in self.lams:
+            self.lam = lam
+            i = 0
+            g_a = np.ones(self.a.shape[0])
+            t = 0.1
+            #while i < self.max_iter and np.linalg.norm(g_a)**2 * t > self.epsilon:
+            while np.linalg.norm(g_a) ** 2 * t > self.epsilon:
+                #while i < self.max_iter:
+                g_a, cost,t,obj = self.step()
+                i+=1
+
 
 def init_a(m,k,y):
     start = np.random.randint(0, m)
@@ -236,7 +227,7 @@ def init_a(m,k,y):
 
 if __name__ == "__main__":
 
-
+    '''
     k=2000
     m=1000000
 
@@ -329,4 +320,4 @@ if __name__ == "__main__":
     plt.ylabel("Objective function")
     plt.legend()
     plt.show()
-    '''
+
