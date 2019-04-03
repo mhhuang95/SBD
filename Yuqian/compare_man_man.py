@@ -8,7 +8,7 @@ class ManPG1(object):
         self.k = k
         self.theta = 1 / k
         self.max_iter = 1000
-        self.epsilon = 1e-3
+        self.epsilon = 1e-5
 
         self.a0 = a0
         self.x0 = x0
@@ -17,7 +17,7 @@ class ManPG1(object):
         self.a = a
         self.x = x
 
-        self.lams = [0.5, 0.1, 0.01, 0.001,0.0001]
+        self.lams = [0.5, 0.1, 0.01]
         self.lam = 0.5
 
     def init_a(self):
@@ -121,7 +121,7 @@ class ManPG2(object):
         self.k = k
         self.theta = 1 / k
         self.max_iter = 1000
-        self.epsilon = 1e-3
+        self.epsilon = 1e-5
 
         self.a0 = a0
         self.x0 = x0
@@ -130,7 +130,7 @@ class ManPG2(object):
         self.a = a
         self.x = x
 
-        self.lams = [0.5, 0.1, 0.01, 0.001, 0.0001]
+        self.lams = [0.5, 0.1, 0.01]
         self.lam = 0.5
 
     def init_a(self):

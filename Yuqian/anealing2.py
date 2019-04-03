@@ -2,53 +2,58 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-class anealing(object):
-    def __init__(self, m, k):
+class annealing(object):
+    def __init__(self, m, k,theta):
         self.m = m
         self.k = k
-        self.theta = 2 / k
-        self.max_iter = 1000
+        self.theta = theta
+        self.max_iter = 100
         self.epsilon = 1e-3
 
         self.a0 = np.random.randn(k)
         self.a0 /= np.linalg.norm(self.a0)
         self.x0 = (np.random.rand(m) <= self.theta) * np.random.randn(m)
-        self.y = np.real(self.conv(self.x0,self.a0))
+        self.y = np.real(self.conv(self.x0, self.a0))
         self.yhat = np.fft.fft(self.y)
-        
+
+        self.lams = [0.5, 0.1, 0.01]
+        self.lam = 0.5
+
+        '''
         self.max_lam = 0.5
         self.min_lam = 0.00001
         self.t = 0
         self.lam = 0.5
         self.num_steps = 20000
         self.dlam = (self.max_lam - self.min_lam)/self.num_steps
+        '''
 
     def init_a(self):
         start = 55
-        ainit = np.hstack([self.y,self.y])[start:(start + self.k)]
+        ainit = np.hstack([self.y, self.y])[start:(start + self.k)]
         ainit = np.hstack([np.zeros(self.k - 1), ainit, np.zeros(self.k - 1)])
         ainit /= np.linalg.norm(ainit)
         return ainit
 
-    def conv(self, x,a):
+    def conv(self, x, a):
         xhat = np.fft.fft(x)
-        ahat = np.fft.fft(a,self.m)
-        return np.fft.ifft(xhat*ahat)
+        ahat = np.fft.fft(a, self.m)
+        return np.fft.ifft(xhat * ahat)
 
-    def soft(self,x,lam):
-        return np.sign(x)*np.maximum(np.abs(x)-lam,0)
+    def soft(self, x, lam):
+        return np.sign(x) * np.maximum(np.abs(x) - lam, 0)
 
-    def Exp(self,a,de):
+    def Exp(self, a, de):
         nde = np.linalg.norm(de)
         if nde > 0:
-            return np.cos(nde) * a + np.sin(nde)*de/nde
+            return np.cos(nde) * a + np.sin(nde) * de / nde
         else:
             return a
 
-    def proj2tan(self,a,g):
-        return g-a.T.dot(g)*a
+    def proj2tan(self, a, g):
+        return g - a.T.dot(g) * a
 
-    def evaluate(self,a,lam):
+    def evaluate(self, a, lam):
         max_it = 100
         tol = 1e-4
         cost = 1
@@ -65,9 +70,7 @@ class anealing(object):
         it = 0
 
         while it < max_it and np.abs(cost - cost_) > tol:
-            self.x = self.soft(np.real(np.fft.ifft(w-s*(a2hat*w-ayhat))),s*self.lam)
-            self.t += 1
-            self.lam -= self.dlam
+            self.x = self.soft(np.real(np.fft.ifft(w - s * (a2hat * w - ayhat))), s * self.lam)
 
             t_ = (1 + np.sqrt(1 + 4 * t * t)) / 2
             xhat = np.fft.fft(self.x)
@@ -75,11 +78,12 @@ class anealing(object):
 
             t = t_
             xhat_ = xhat
-            it+=1
+            it += 1
 
             cost_ = cost
-            cost = 0.5*np.linalg.norm(np.real(np.fft.ifft(ahat*xhat)) - self.y)**2+self.lam * np.sum(np.abs(self.x))
-
+            cost = 0.5 * np.linalg.norm(np.real(np.fft.ifft(ahat * xhat)) - self.y) ** 2 + self.lam * np.sum(
+                np.abs(self.x))
+            self.costs.append(cost)
         return cost
 
     def calc_grad(self):
@@ -94,17 +98,17 @@ class anealing(object):
 
     def step(self):
 
-        g_a, cost,xhat = self.calc_grad()
-        g_a = self.proj2tan(self.a,g_a)
+        g_a, cost, xhat = self.calc_grad()
+        g_a = self.proj2tan(self.a, g_a)
 
-        t = 0.99/np.max(np.abs(xhat))**2
+        t = 0.99 / np.max(np.abs(xhat)) ** 2
 
-        self.a =self.Exp(self.a,-t*g_a)
+        self.a = self.Exp(self.a, -t * g_a)
         self.a /= np.linalg.norm(self.a)
 
         ahat = np.fft.fft(self.a, self.m)
         obj = 0.5 * np.linalg.norm(np.real(np.fft.ifft(ahat * xhat)) - self.y) ** 2 + self.lam * np.sum(np.abs(self.x))
-        return g_a, cost,t, obj
+        return g_a, cost, t, obj
 
     def solve(self):
 
@@ -118,19 +122,25 @@ class anealing(object):
         self.costs = [obj]
 
         self.a = self.calc_grad()[0]
-        #print(self.a)
-        self.a = -1*self.a
+        # print(self.a)
+        self.a = -1 * self.a
         self.a /= np.linalg.norm(self.a)
         g_a = np.ones(self.a.shape[0])
         t = 0.1
 
+        for lam in self.lams:
+            i = 0
+            g_a = np.ones(self.a.shape[0])
+            t = 0.1
+            while i < self.max_iter and np.linalg.norm(g_a)**2 * t > self.epsilon:
+            #while np.linalg.norm(g_a) ** 2 * t > self.epsilon:
+                # while i < self.max_iter:
+                g_a, cost, t, obj = self.step()
+                i += 1
+                # print("--- %s seconds ---" % (time.time() - start))
 
-        while self.t < self.num_steps:
-            g_a, cost,t,obj = self.step()
-            self.costs.append(obj)
-        #print("--- %s seconds ---" % (time.time() - start))
 
-def maxdoshift(a0,a):
+def maxdoshift(a0, a):
     return np.max(np.abs(np.correlate(a0, a, "full")))
 
 
@@ -149,20 +159,36 @@ if __name__ == "__main__":
     print("average max_i|<s_i[a_0],a>|:", sum(res) / len(res))
 
     '''
-
-
-    s = anealing(10000,20)
+    '''
+    s = annealing(256*256,1310 ,theta = 0.3)
     s.solve()
-    print("Kernel a: max_i|<s_i[a_0],a>| = ",maxdoshift(s.a0,s.a))
+    print("Kernel a: max_i|<s_i[a_0],a>| = ", maxdoshift(s.a0, s.a))
     print(np.linalg.norm(s.x0 - s.x))
-    
+
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1)
-    ax.plot(s.a0,'r-',label='a0')
-    ax.plot(s.a,'b-',label='a')
-
+    ax.plot(s.a0, 'r-', label='a0')
+    ax.plot(s.a, 'b-', label='a')
 
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1)
     ax.semilogy(s.costs, 'k', label='obj')
+    plt.show()
+
+    '''
+    m = 256*256
+    ks = np.linspace(0.02, 0.2, 10)
+    thetas = np.logspace(-3, -1, 10)
+    res = np.zeros([10,10])
+    for i in range(1):
+        print(i)
+        for l,k in enumerate(ks):
+            for j, theta in enumerate(thetas):
+                s = annealing(m, int(k*m),theta)
+                s.solve()
+                res[j][l] += 1-maxdoshift(s.a0, s.a)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1)
+    ax.imshow(res)
     plt.show()

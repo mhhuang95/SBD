@@ -55,21 +55,21 @@ class ManPG(object):
 
         xhat = np.fft.fft(self.x)
 
-        d_x = self.soft(np.real(np.fft.ifft(xhat - s * (a2hat * xhat - ayhat))), s * self.lam) - self.x
+        self.x = self.soft(np.real(np.fft.ifft(xhat - s * (a2hat * xhat - ayhat))), s * self.lam)
 
         g_a = np.real(np.fft.ifft(np.conj(xhat) * (xhat * ahat - self.yhat)))
         g_a = g_a[:self.a.shape[0]]
 
-        return g_a, xhat,d_x
+        return g_a, xhat
 
-    def F(self, a,x, lam):
-        xhat = np.fft.fft(x)
+    def F(self, a, lam):
+        xhat = np.fft.fft(self.x)
         return 0.5 * np.linalg.norm(np.real(np.fft.ifft(np.fft.fft(a, self.m) * xhat)) - self.y) ** 2 + lam * np.sum(
-            np.abs(x))
+            np.abs(self.x))
 
     def step(self):
 
-        g_a, xhat,d_x = self.calc_grad()
+        g_a, xhat = self.calc_grad()
         g_a = self.proj2tan(self.a, g_a)
 
         t = 0.99 / np.max(np.abs(xhat) ** 2)
@@ -78,10 +78,10 @@ class ManPG(object):
         alpha = 1
         delta = 0.7
         gamma = 0.5
-        while self.F(self.a + alpha * d_a, self.x + alpha * d_x,self.lam) > self.F(self.a, self.x, self.lam) - delta * alpha * np.linalg.norm(np.hstack([d_a,d_x])) ** 2:
+        while self.F(self.a + alpha * d_a, self.lam) > self.F(self.a, self.lam) - delta * alpha * np.linalg.norm(
+                d_a) ** 2:
             alpha = gamma * alpha
 
-        self.x += alpha * d_x
         self.a = self.Exp(self.a, alpha * d_a)
         self.a /= np.linalg.norm(self.a)
 
@@ -112,10 +112,11 @@ class ManPG(object):
                 self.costs.append(obj)
         # print("--- %s seconds ---" % (time.time() - start))
         '''
-        while 1 - maxdoshift(self.a0, self.a) > 0.0000001:
+        while 1-maxdoshift(self.a0,self.a) > 0.0000001:
             g_a, t, obj = self.step()
             self.costs.append(obj)
         '''
+
 
 def maxdoshift(a0, a):
     k = a0.shape[0]
@@ -136,19 +137,20 @@ def init_a(m, k, y):
 
 
 if __name__ == "__main__":
-    '''
+
     res = []
-    m = 10000
-    k = 20
+    m = [x for x in range(500, 2600, 125)]
+    k = 50
+    theta = [x for x in range(0.01, 0.2, 0.01)]
     for i in range(20):
         a0 = np.random.randn(k)
         a0 /= np.linalg.norm(a0)
-        theta = 1/k
+        theta = 1 / k
         x0 = (np.random.rand(m) <= theta) * np.random.randn(m)
-        y = np.real(np.fft.ifft(np.fft.fft(x0)*np.fft.fft(a0,m)))
-        a = init_a(m,k,y)
-        x =  np.random.randn(m)
-        s = ManPG(m,k,a0, x0,a,x)
+        y = np.real(np.fft.ifft(np.fft.fft(x0) * np.fft.fft(a0, m)))
+        a = init_a(m, k, y)
+        x = np.random.randn(m)
+        s = ManPG(m, k, a0, x0, a, x)
         start_time = time.time()
         s.solve()
         print("Experiment", i + 1, "running time: --- %s seconds ---" % (time.time() - start_time))
@@ -157,8 +159,8 @@ if __name__ == "__main__":
 
     print("average max_i|<s_i[a_0],a>|:", sum(res) / len(res))
     '''
-    m = 10000
-    k = 20
+    m = 100000
+    k = 200
     a0 = np.random.randn(k)
     a0 /= np.linalg.norm(a0)
     theta = 1 / k
@@ -167,20 +169,23 @@ if __name__ == "__main__":
     a = init_a(m, k, y)
     x = np.random.randn(m)
 
-    s = ManPG(10000, 20, a0, x0, a, x)
+    s = ManPG(m,k, a0,x0,a,x)
     start_time = time.time()
     s.solve()
-    print(s.a)
+    print(s.a0)
     print("Kernel a: max_i|<s_i[a_0],a>| = ", maxdoshift(s.a0, s.a))
+
 
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1)
-    ax.plot(s.a0, 'k', label='a0')
-    ax.plot(s.a, 'k--', label='a')
+    ax.plot(s.a0,'k',label='a0')
+    ax.plot(s.a,'k--',label='a')
+
 
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1)
     ax.semilogy(s.costs, 'k', label='obj')
 
     plt.show()
+    '''
 

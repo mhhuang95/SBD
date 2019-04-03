@@ -112,7 +112,7 @@ class ManPG(object):
 
 
 
-class anealing(object):
+class annealing(object):
     def __init__(self, x0,a0,x,a):
         self.m = x0.shape[0]
         self.k = a0.shape[0]
@@ -288,7 +288,7 @@ if __name__ == "__main__":
     y = np.real(np.fft.ifft(np.fft.fft(x0) * np.fft.fft(a0, m)))
     x = np.random.randn(m)
     a = init_a(m, k, y)
-    s1 = anealing(x0, a0, x, a)
+    s1 = annealing(x0, a0, x, a)
     s1.solve()
     print("ane Kernel a: max_i|<s_i[a_0],a>| = ", maxdoshift(s1.a0, s1.a))
     print(np.linalg.norm(np.abs(s1.x0) - np.abs(s1.x))/np.linalg.norm(s1.x0))

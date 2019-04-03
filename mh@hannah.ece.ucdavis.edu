@@ -1,0 +1,119 @@
+#Manifold proximal gradient algorithm for Blind Deconvolution
+#Minhui Huang 12/18/2018
+
+import numpy as np
+
+#Compute the circular matrix C_v, the input is a or x
+def con_grad(x):
+    m = x.shape[0]
+    grad = np.zeros([m, m])
+    for i in range(m):
+        for j in range(m):
+            grad[i][j] = x[(i - j) % m, 0]
+    return grad
+
+def grad_x(C_a,x_k,y):
+    return C_a.T.dot(C_a.dot(x_k)-y)
+
+def grad_a(C_x, a_k,y):
+    return C_x.T.dot(C_x.dot(a_k)-y)
+
+#compute the target function F(a,x) = 0.5||a \conv x - y||_2^2 + lam*|x|_1
+def F(a, x, y,lam):
+    C_a = con_grad(a)
+    return 0.5*np.linalg.norm(C_a.dot(x)-y)**2 + lam*np.sum(np.abs(x))
+
+#compute the smooth function f_x(u) = 0.5*||u-(x_k-t*\nabla_xF)||_2^2
+def f_x(u,x_k,t,dF_x):
+    return 0.5*np.linalg.norm(u-(x_k-t*dF_x))**2
+
+#a model for line search
+def model(x,xk,C,y,t):
+    innerProd = grad_x(C,xk,y).T.dot(x - xk)
+    xDiff = x - xk
+    return 0.5*np.linalg.norm(C.dot(xk)-y)**2 + innerProd + (1.0/(2.0*t))*xDiff.T.dot(xDiff)
+
+#compute the projection onto a sphere
+def a_retr(a_k,dim_a):
+    l = a_k.shape[0]
+    a_tmp = a_k[:dim_a,:]
+    res = a_tmp / np.sqrt(np.sum(a_tmp**2))
+    res = np.vstack([res, np.zeros([l-dim_a,1])])
+    return res
+
+def find_gradient_direction(x_k, a_k, y,lam):
+    C_a = con_grad(a_k)
+    g_x = grad_x(C_a, x_k,y)
+    C_x = con_grad(x_k)
+    g_a = grad_a(C_x, a_k,y)
+    beta = 0.7
+    t = 0.1
+
+    while f_x(x_k - t * g_x,x_k, t,g_x) > model(x_k - t * g_x, x_k, C_a, y, t):
+        t = beta * t
+    u = x_k - t * g_x
+    dx = np.sign(u) * np.maximum(np.abs(u) - t * lam, np.zeros(np.shape(u))) - x_k
+
+    da = ((a_k.T.dot(g_a))/(a_k.T.dot(a_k))*a_k - g_a)*t
+
+    return dx,da
+
+def shift(a_true, i, dim_a, dim_x):
+    res = np.zeros([dim_x,1])
+    if i <= dim_x - dim_a:
+        res[i:dim_a+i,:] = a_true
+    else:
+        res[i:,:] = a_true[:(dim_x-dim_a-i),:]
+        res[:(i+dim_a-dim_x),:] = a_true[(dim_x-dim_a-i):,:]
+    return res[:dim_a]
+
+
+def main():
+    error = np.ones([20, 7])
+
+    gamma = 0.5
+    delta = 0.01
+
+    # lams = [0.01,0.02,0.03,0.04,0.05,0.06, 0.07, 0.08]
+    lam =0.5
+    epsilon = 0.01
+    dim_xs = list(range(100, 2100, 100))
+    dim_as = list(range(10, 80, 10))
+
+    for k, dim_x in enumerate(dim_xs):
+        for j,dim_a in enumerate(dim_as):
+
+            x_true = np.zeros([dim_x, 1])
+            x_true[np.random.randint(0,dim_x)] = 1
+            a_true = np.random.randn(dim_a, 1)
+            a_true = a_true / (np.linalg.norm(a_true))
+            y = con_grad(np.vstack([a_true, np.zeros([ dim_x-dim_a,1])])).dot(x_true)
+            x_k = np.random.randn(dim_x, 1)
+            a_k = np.random.randn(dim_a, 1)
+            a_k = a_k / (np.linalg.norm(a_k))
+            a_k = np.vstack([a_k, np.zeros([dim_x-dim_a,1])])
+
+
+
+            #ManPG algorithm
+
+            dx = np.ones([dim_x, 1])
+            da = np.ones([dim_a, 1])
+            while np.sum(np.abs(da[:dim_a, 0])) >= epsilon:
+                # print(np.linalg.norm(x_k_ - x_true) / np.linalg.norm(x_true))
+                dx, da = find_gradient_direction(x_k, a_k, y, lam)
+
+                alpha = 1
+                while F(a_retr(a_k + alpha * da, dim_a), x_k + dx, y, lam) > F(a_k, x_k + dx, y,lam) - delta * alpha * np.sum(da[:dim_a, 0] ** 2):
+                    alpha = gamma * alpha
+                    # print(iter)
+                x_k = x_k + dx
+                a_k = a_retr(a_k + alpha * da, dim_a)
+                # print("lam = ", lam, np.linalg.norm(x_k_ - x_true), np.linalg.norm(a_k_ - a_true))
+            for i in range(dim_x):
+                error[k][j] = min(error[k][j], np.linalg.norm(a_k[:dim_a] + shift(a_true,i,dim_a,dim_x)), np.linalg.norm(a_true - shift(a_true,i,dim_a,dim_x)))
+
+    print(error)
+
+if __name__ == "__main__":
+    main()

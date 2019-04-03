@@ -1,6 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 import time
+
+from sklearn.datasets import load_digits
 
 class ManPG(object):
     def __init__(self, m, k,a0,x0,a,x):
@@ -8,7 +11,7 @@ class ManPG(object):
         self.k = k
         self.theta = 1 / k
         self.max_iter = 1000
-        self.epsilon = 1e-3
+        self.epsilon = 1e-5
 
         self.a0 = a0
         self.x0 = x0
@@ -17,7 +20,7 @@ class ManPG(object):
         self.a = a
         self.x = x
 
-        self.lams = [0.5, 0.1, 0.01, 0.001,0.0001]
+        self.lams = [0.5, 0.1]
         self.lam = 0.5
 
     def init_a(self):
@@ -63,7 +66,7 @@ class ManPG(object):
 
     def F(self,a,lam):
         xhat = np.fft.fft(self.x)
-        return 0.5*np.linalg.norm(np.real(np.fft.ifft(np.fft.fft(a,self.m) * xhat)) - self.y)**2 + lam*np.sum(np.abs(self.x))
+        return 0.5*np.linalg.norm(np.fft.ifft(np.fft.fft(a,self.m) * xhat) - self.y)**2 + lam*np.sum(np.abs(self.x))
 
     def step(self):
 
@@ -71,31 +74,31 @@ class ManPG(object):
         g_a = self.proj2tan(self.a, g_a)
 
         t = 0.99/np.max(np.abs(xhat)**2)
-        d_a = t*(self.a.T.dot(g_a))/(self.a.T.dot(self.a)) - t * g_a
+        d_a = t*(self.a.T.dot(g_a))*self.a - t * g_a
+
 
         alpha = 1
+        '''
         delta = 0.7
         gamma = 0.5
         while self.F(self.a+alpha*d_a, self.lam) > self.F(self.a,self.lam)-delta*alpha*np.linalg.norm(d_a)**2:
             alpha = gamma * alpha
-
+        '''
         self.a =self.Exp(self.a,alpha*d_a)
         self.a /= np.linalg.norm(self.a)
 
         ahat = np.fft.fft(self.a,self.m)
-        obj = 0.5 * np.linalg.norm(np.real(np.fft.ifft(ahat * xhat)) - self.y) ** 2 + self.lam * np.sum(np.abs(self.x))
+        obj = 0.5 * np.linalg.norm(np.fft.ifft(ahat * xhat) - self.y) ** 2 + self.lam * np.sum(np.abs(self.x))
 
         return g_a,t, obj
 
     def solve(self):
 
 
-        #start = time.time()
-
         self.a /= np.linalg.norm(self.a)
         ahat = np.fft.fft(self.a, self.m)
         xhat = np.fft.fft(self.x)
-        obj = 0.5 * np.linalg.norm(np.real(np.fft.ifft(ahat * xhat)) - self.y) ** 2 + self.lam * np.sum(np.abs(self.x))
+        obj = 0.5 * np.linalg.norm(np.fft.ifft(ahat * xhat) - self.y) ** 2 + self.lam * np.sum(np.abs(self.x))
 
         self.costs = [obj]
 
@@ -104,16 +107,11 @@ class ManPG(object):
             i = 0
             g_a = np.ones(self.a.shape[0])
             t = 0.1
-            while i < self.max_iter and np.linalg.norm(g_a)**2 * t > self.epsilon:
+            while np.linalg.norm(g_a)**2 * t > self.epsilon:
                 g_a, t,obj = self.step()
                 i+=1
                 self.costs.append(obj)
-        #print("--- %s seconds ---" % (time.time() - start))
-        '''
-        while 1-maxdoshift(self.a0,self.a) > 0.0000001:
-            g_a, t, obj = self.step()
-            self.costs.append(obj)
-        '''
+            print(i)
 
 
 def maxdoshift(a0,a):
@@ -129,33 +127,63 @@ def maxdoshift(a0,a):
 def init_a(m,k,y):
     start = np.random.randint(0, m)
     ainit = np.hstack([y,y])[start:(start + k)]
-    ainit /= np.linalg.norm(ainit)
+    ainit = ainit/np.linalg.norm(ainit)
     ainit = np.hstack([np.zeros(k-1), ainit, np.zeros(k-1)])
     return ainit
 
 
 if __name__ == "__main__":
 
-    res = []
-    m = 10000
-    k = 20
-    for i in range(20):
-        a0 = np.random.randn(k)
-        a0 /= np.linalg.norm(a0)
-        theta = 1/k
-        x0 = (np.random.rand(m) <= theta) * np.random.randn(m)
-        y = np.real(np.fft.ifft(np.fft.fft(x0)*np.fft.fft(a0,m)))
-        a = init_a(m,k,y)
-        x =  np.random.randn(m)
-        s = ManPG(m,k,a0, x0,a,x)
-        start_time = time.time()
-        s.solve()
-        print("Experiment", i + 1, "running time: --- %s seconds ---" % (time.time() - start_time))
-        res.append(maxdoshift(s.a0, s.a))
-        print("Kernel a: max_i|<s_i[a_0],a>| = ", maxdoshift(s.a0, s.a))
 
-    print("average max_i|<s_i[a_0],a>|:", sum(res) / len(res))
+    res = []
+    m = 255*255
+    k = 20
+    img = np.array(mpimg.imread('x.jpg'))
+    img = np.array(img / np.max(img))
+    i1 = np.gradient(img)[0]
+    i1 = i1 / np.max(i1)
+    print(np.sum(i1 < 0.1) / (255 * 255))
+    img = img*(img > 0.5)
+    print(np.sum(img == 0)/(255*255))
+    fig = plt.figure()
+    ax1 = fig.add_subplot(1, 3, 1)
+    ax1.imshow(1)
+
+    x0 = img
+    ker = np.array(mpimg.imread('f.jpg'))
+    a0 = (ker/np.linalg.norm(ker))
+
+    #for i in range(1):
+
+    y = np.real(np.fft.ifft(np.fft.fft(x0)*np.fft.fft(a0,m)))
+
+    ax2 = fig.add_subplot(1, 3, 2)
+    ax2.imshow(y)
+
     '''
+    y = y.flatten()
+    a = init_a(m,k,y)
+    x = np.random.randn(m)
+    s = ManPG(m,k,a0, x0,a,x)
+    start_time = time.time()
+    s.solve()
+    print("Kernel a: max_i|<s_i[a_0],a>| = ", maxdoshift(s.a0, s.a))
+
+
+    recover = s.x
+    recover = recover.reshape([255,255])
+    ax3 = fig.add_subplot(1, 3, 3)
+    ax3.imshow(recover)
+    '''
+    plt.show()
+
+
+
+
+
+
+    '''
+
     m = 100000
     k = 200
     a0 = np.random.randn(k)
@@ -185,4 +213,3 @@ if __name__ == "__main__":
     
     plt.show()
     '''
-
